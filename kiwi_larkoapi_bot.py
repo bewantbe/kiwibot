@@ -1,20 +1,22 @@
 # test communication to Feishu
 
+import os
 import time
 import datetime
 import hashlib
 import base64
 import hmac
-import requests
-from requests_toolbelt import MultipartEncoder
 import logging
 import json
 
-import lark_oapi as lark
+import requests
+from requests_toolbelt import MultipartEncoder
+
 from dotenv import load_dotenv
-import os
+import lark_oapi as lark
 from lark_oapi.api.im.v1 import (
     CreateImageRequest, CreateImageRequestBody, CreateImageResponse,
+    CreateMessageRequest, CreateMessageRequestBody, CreateMessageResponse,
 )
 
 
@@ -91,30 +93,60 @@ def get_tenant_access_token(app_id, app_secret):
     # in r['tenant_access_token']
     return r
 
+def send_msg_to_user(user_id_in_app, msg_type, content, client):
+    # Ref. https://open.feishu.cn/document/server-docs/im-v1/message/create
+
+    if msg_type == "text" and isinstance(content, str):
+        content = {
+            "text": content
+        }
+
+    request: CreateMessageRequest = CreateMessageRequest.builder() \
+        .receive_id_type("open_id") \
+        .request_body(CreateMessageRequestBody.builder()
+            .receive_id(user_id_in_app)
+            .msg_type(msg_type)
+            .content(json.dumps(content, ensure_ascii=False))
+            .build()) \
+        .build()
+
+    # 发起请求
+    response: CreateMessageResponse = client.im.v1.message.create(request)
+
+    # 处理失败返回
+    if not response.success():
+        lark.logger.error(
+            f"client.im.v1.message.create failed, code: {response.code}, "
+            f"msg: {response.msg}, log_id: {response.get_log_id()}, "
+            f"resp: \n{json.dumps(json.loads(response.raw.content), indent=4, ensure_ascii=False)}"
+        )
+        return
+
+    # 处理业务结果
+    lark.logger.info(lark.JSON.marshal(response.data, indent=4))
+
 if __name__ == '__main__':
-    
-    # Webhook:
     load_dotenv()
 
     webhook_url = os.getenv('GROUP_WEBHOOK_URL')
     webhook_secret = os.getenv('GROUP_WEBHOOK_SECRET')
 
+    # Test send message to group
     if 0:
-        # Send message
         group_bot_send_msg("text", "Hello, Kiwi!", webhook_url, webhook_secret)
 
     app_id = os.getenv('APP_ID')
     app_secret = os.getenv('APP_SECRET')
 
+    client = lark.Client.builder() \
+        .app_id(app_id) \
+        .app_secret(app_secret) \
+        .log_level(lark.LogLevel.DEBUG) \
+        .build()
+
     if 0:
         # Upload image
         img_path = 'test_bot.webp'
-
-        client = lark.Client.builder() \
-            .app_id(app_id) \
-            .app_secret(app_secret) \
-            .log_level(lark.LogLevel.DEBUG) \
-            .build()
 
         r = upload_img(img_path, client)
         print(r)
@@ -129,6 +161,7 @@ if __name__ == '__main__':
             "image_key": image_key
         }
         group_bot_send_msg("image", content, webhook_url, webhook_secret)
-
-# Ref.
-# https://open.feishu.cn/document/home/develop-a-bot-in-5-minutes/step-5-configure-event-subscription
+    
+    # test application bot
+    user_id_in_app = 'ou_0b2ada4556de2f7b7ddc6557b6f4292b'
+    send_msg_to_user(user_id_in_app, "text", "Hello, this is Kiwi!", client)
