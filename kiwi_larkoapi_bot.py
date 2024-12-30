@@ -17,6 +17,8 @@ import lark_oapi as lark
 from lark_oapi.api.im.v1 import (
     CreateImageRequest, CreateImageRequestBody, CreateImageResponse,
     CreateMessageRequest, CreateMessageRequestBody, CreateMessageResponse,
+    ReplyMessageRequest, ReplyMessageRequestBody, ReplyMessageResponse,
+    P2ImMessageReceiveV1,
 )
 
 
@@ -125,6 +127,86 @@ def send_msg_to_user(user_id_in_app, msg_type, content, client):
     # 处理业务结果
     lark.logger.info(lark.JSON.marshal(response.data, indent=4))
 
+# Register event handler to handle received messages.
+# https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/events/receive
+def do_p2_im_message_receive_v1(data: P2ImMessageReceiveV1) -> None:
+    res_content = ""
+    if data.event.message.message_type == "text":
+        res_content = json.loads(data.event.message.content)["text"]
+    else:
+        res_content = "Failed to parse, please send text message"
+
+    content = json.dumps(
+        {
+            "text": "Received message:"\
+                   + res_content
+        }
+    )
+
+    if data.event.message.chat_type == "p2p":
+        request = (
+            CreateMessageRequest.builder()
+            .receive_id_type("chat_id")
+            .request_body(
+                CreateMessageRequestBody.builder()
+                .receive_id(data.event.message.chat_id)
+                .msg_type("text")
+                .content(content)
+                .build()
+            )
+            .build()
+        )
+        # Use send OpenAPI to send messages
+        # https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create
+        response = client.im.v1.chat.create(request)
+
+        if not response.success():
+            raise Exception(
+                f"client.im.v1.chat.create failed, code: {response.code}, "
+                f"msg: {response.msg}, log_id: {response.get_log_id()}"
+            )
+    else:
+        request: ReplyMessageRequest = (
+            ReplyMessageRequest.builder()
+            .message_id(data.event.message.message_id)
+            .request_body(
+                ReplyMessageRequestBody.builder()
+                .content(content)
+                .msg_type("text")
+                .build()
+            )
+            .build()
+        )
+        # Reply to messages using send OpenAPI
+        # https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/reply
+        response: ReplyMessageResponse = client.im.v1.message.reply(request)
+        if not response.success():
+            raise Exception(
+                f"client.im.v1.message.reply failed, code: {response.code}, "
+                f"msg: {response.msg}, log_id: {response.get_log_id()}"
+            )
+
+def start_echo_bot(client):
+    # Echo bot
+    # Ref. https://open.feishu.cn/document/uAjLw4CM/uMzNwEjLzcDMx4yM3ATM/develop-an-echo-bot/development-steps
+    # Ref. https://github.com/larksuite/lark-samples/tree/main/echo_bot/python
+
+    # Register event handler.
+    event_handler = (
+        lark.EventDispatcherHandler.builder("", "")
+        .register_p2_im_message_receive_v1(do_p2_im_message_receive_v1)
+        .build()
+    )
+    wsClient = lark.ws.Client(
+        lark.APP_ID,
+        lark.APP_SECRET,
+        event_handler=event_handler,
+        log_level=lark.LogLevel.DEBUG,
+    )
+
+    #  Start long-lived connection and register event handler.
+    wsClient.start()
+
 if __name__ == '__main__':
     load_dotenv()
 
@@ -162,6 +244,9 @@ if __name__ == '__main__':
         }
         group_bot_send_msg("image", content, webhook_url, webhook_secret)
     
-    # test application bot
-    user_id_in_app = 'ou_0b2ada4556de2f7b7ddc6557b6f4292b'
-    send_msg_to_user(user_id_in_app, "text", "Hello, this is Kiwi!", client)
+    if 0:
+        # test application bot
+        user_id_in_app = 'ou_0b2ada4556de2f7b7ddc6557b6f4292b'
+        send_msg_to_user(user_id_in_app, "text", "Hello, this is Kiwi!", client)
+
+    start_echo_bot(client)
