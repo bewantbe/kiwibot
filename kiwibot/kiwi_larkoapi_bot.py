@@ -63,6 +63,8 @@ def main():
         feishu_portal.send_queue.put(msg)
         feishu_portal.recv_queue.task_done()
         break
+    feishu_portal.send_queue.join()
+    time.sleep(1)
 
 if __name__ == '__main__':
     main()
