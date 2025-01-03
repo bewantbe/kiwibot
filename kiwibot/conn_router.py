@@ -45,7 +45,7 @@ class MessageRouter(threading.Thread):
                     msg = self.recv_queue.get(timeout=1)
                     if self.send_queue:
                         msg['content']['text'] = f"Received: {msg['content']['text']}"
-                        self.send_queue.put(f"Received: {msg}")
+                        self.send_queue.put(msg)
                 except queue.Empty:
                     continue
 
