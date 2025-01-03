@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from conn_api import (
     FeishuPortal,
 )
-from conn_macaca import MessageRouter
+from conn_router import MessageRouter
 
 def main_test1():
     load_dotenv()
