@@ -37,8 +37,8 @@ def main_test2():
     feishu_portal = FeishuPortal(app_id, app_secret, "log.json")
     msg_router = MessageRouter()
     msg_router.register_queues(feishu_portal.recv_queue, feishu_portal.send_queue)
-    #msg_router.register_timed_event(15, f'Time now: {time.time()}')
     msg_router.start()
+    msg_router.register_timed_event(15, 'eddy', 'time')
     msg_router.join()
 
 if __name__ == '__main__':
