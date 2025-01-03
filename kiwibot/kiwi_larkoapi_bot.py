@@ -166,6 +166,7 @@ def do_p2_im_message_receive_v1(data: P2ImMessageReceiveV1) -> None:
                 f"msg: {response.msg}, log_id: {response.get_log_id()}"
             )
     else:
+        # replay when @at
         request: ReplyMessageRequest = (
             ReplyMessageRequest.builder()
             .message_id(data.event.message.message_id)
