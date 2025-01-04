@@ -6,17 +6,13 @@ import time
 import copy
 
 class MessageRouter(threading.Thread):
-    def __init__(self):
+    def __init__(self, recv_queue, send_queue):
         super().__init__()
-        self.recv_queue = None
-        self.send_queue = None
+        self.recv_queue = recv_queue
+        self.send_queue = send_queue
         self.timed_events = {}
         self.running = True
         self.timer_id_counter = 0
-
-    def register_queues(self, recv_queue, send_queue):
-        self.recv_queue = recv_queue
-        self.send_queue = send_queue
 
     def register_timed_event(self, interval, user_name, action_string):
         message = {
