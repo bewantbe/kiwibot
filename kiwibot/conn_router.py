@@ -13,6 +13,7 @@ class MessageRouter(threading.Thread):
         self.timed_events = {}
         self.running = True
         self.timer_id_counter = 0
+        self.message_dealer = lambda x: f"Received: {x}"
 
     def register_timed_event(self, interval, user_name, action_string):
         message = {
@@ -47,9 +48,12 @@ class MessageRouter(threading.Thread):
                 response = self._action_then_response(message)
                 self.send_queue.put(response)
 
+    def set_message_dealer(self, message_dealer):
+        self.message_dealer = message_dealer
+
     def _single_response(self, msg):
         response = copy.deepcopy(msg)
-        response['content']['text'] = f"Received: {msg['content']['text']}"
+        response['content']['text'] = self.message_dealer(msg['content']['text'])
         return response
 
     def _action_then_response(self, msg):
