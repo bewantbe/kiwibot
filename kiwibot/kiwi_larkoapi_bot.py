@@ -3,7 +3,8 @@
 import os
 import time
 from dotenv import load_dotenv
-from conn_api import (
+
+from conn_lark import (
     FeishuPortal,
 )
 from conn_router import MessageRouter
