@@ -38,6 +38,17 @@ def group_bot_gen_sign(timestamp, secret):
     return sign
 
 def group_bot_send_msg(msg_type, content, webhook_url, webhook_secret):
+    """
+    ##Bot in group
+    https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot
+
+    Webhook:
+    https://open.feishu.cn/open-apis/bot/v2/hook/260e63f5-d8bc-4ef7-a058-8cb483d6b42d
+
+    The request body size cannot exceed 20K.
+    Image cannot exceed 10 MB
+    resolution of other images cannot exceed 12000 x 12000
+    """
     logging.info('Sending message...')
     timestamp = int(time.time())
 
@@ -83,6 +94,32 @@ def upload_img(img_path, client):
     # 处理业务结果
     lark.logger.info(lark.JSON.marshal(response.data, indent=4))
     return response.data
+
+def upload_img_plain(img_path, tenant_access_token):
+    # Ref. Server APIMessagingImages messageUpload image
+    #      https://open.feishu.cn/document/server-docs/im-v1/image/create
+    logging.info('Uploading image...')
+    url = "https://open.feishu.cn/open-apis/im/v1/images"
+    form = {'image_type': 'message',
+            'image': (open(img_path, 'rb'))}  # 需要替换具体的path 
+    multi_form = MultipartEncoder(form)
+    headers = {
+        'Authorization': f'Bearer {tenant_access_token}',
+    }
+    headers['Content-Type'] = multi_form.content_type
+    response = requests.request("POST", url, headers=headers, data=multi_form)
+    logging.info(response.headers['X-Tt-Logid'])  # for debug or oncall
+    logging.info(response.content)  # Print Response
+    assert response.json()['code'] == 0, response.json()
+    return response.json()['data']['image_key']
+
+def gen_sign(timestamp, secret):
+    # Splicing timestamp and secret
+    string_to_sign = f'{timestamp}\n{secret}'
+    hmac_code = hmac.new(string_to_sign.encode("utf-8"), digestmod=hashlib.sha256).digest()
+    # Perform base64 processing on the result
+    sign = base64.b64encode(hmac_code).decode('utf-8')
+    return sign
 
 
 def get_tenant_access_token(app_id, app_secret):
@@ -333,6 +370,41 @@ class FeishuPortal:
         thread = threading.Thread(target=send_from_queue)
         thread.daemon = True
         thread.start()
+
+def old_main0():
+    # Webhook:
+    webhook_url = 'https://open.feishu.cn/open-apis/bot/v2/hook/260e63f5-d8bc-4ef7-a058-8cb483d6b42d'
+    webhook_secret = 'HgPrBKh4dRTIsa0j4feeRh'
+
+    if 0:
+        # Send message
+        group_bot_send_msg("text", "Hello, Kiwi!", webhook_url, webhook_secret)
+
+
+    if 0:
+        app_id = 'cli_a7fb15d3f5795013'
+        app_secret = 'nqwtqwAiaPJZv3xMYNP7jgBBHiX1pbmB'
+        r = get_tenant_access_token(app_id, app_secret)
+        print(r)
+        tenant_access_token = r['tenant_access_token']
+    else:
+        tenant_access_token = 't-g104cu4cAQWQ45ABTPL6HSQF5G4555JGMHQ7MMBC'
+
+    # Upload image
+    img_path = 'test_bot.webp'
+    image_key = upload_img(img_path, tenant_access_token)
+    logging.info(image_key)
+
+    if 0:
+        # Send message with image
+        content = {
+            "image_key": image_key
+        }
+        group_bot_send_msg("image", content, webhook_url, webhook_secret)
+
+    # Ref.
+    # https://open.feishu.cn/document/home/develop-a-bot-in-5-minutes/step-5-configure-event-subscription
+
 
 def old_main():
     load_dotenv()

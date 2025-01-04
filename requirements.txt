@@ -1,0 +1,7 @@
+python-dotenv
+requests
+lark_oapi
+langchain
+langchain-community
+anthropic
+langchain-anthropic
