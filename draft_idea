@@ -1,0 +1,105 @@
+Draft of an advanced chatbot or agent.
+
+basic chat ability
+  - hearing for messages(can be an event) through a recv_queue.
+  - send message through send_queue as response.
+
+have a concept of user
+  - know who you are talking to.
+
+tools
+  - for easier of update, use external file to hold essential functions of it.
+    + desc
+    + function to call
+  - for very complex tools, use a tree like structure to hide details, when thinking, expand the tree when necessary.
+  - when unsure, always ask user for more information.
+
+prompt: general ability + current task in mind + context
+  general ability
+  - you have these tools, when necessary use them to solve user's request.
+  - call the tools in a standard way: [function_name, args...]
+  - if the user's request need multiple steps to accompalish, decompose it.
+  current task in mind (short term memory)
+  - things been interrupted.
+  - things need to assist user later
+  context, conversation history
+  - load more context when necessary
+
+long term memory
+  - note down briefly knowledge with source you learn from user's interactions.
+  - might use embeddings for large and long document memory.
+  - might need some prompt (redirect attention) to help filter things that worth to remember.
+
+timer
+  - implementation: inject current time to recv_queue.
+  - implement an alarm: send event to recv_queue
+  - use prompt to drive Agents do something (if any), such as closing to an event, and remind it to user.
+
+interruption of current works (during solving a task)
+  - implementation: define a tool to interrupt agent itself.
+  - when interrupted, put the current state to short term memory.
+
+conversation history optimization
+  - initially use only latest 3 rounds of chat, if more is needed, add more.
+  - when user said let's start a new conversation, cutoff the history.
+
+send message onbehalf of user
+  - implementation: define a tool to send message onbehalf of user.
+  - draft the message mimic user's style, and ask user to confirm.
+
+Typical applications
+  - chat, with potentially long conversation.
+  - reminder of schedule
+  - operate on online documents, add/remove/modify items.
+  - run commands on remote servers and return results.
+  - add to itself a new tools.
+  - modify itself's behavior through modification of prompt.
+
+Program structure
+  - need to pass in channel to the agent.
+  - main loop
+    + get message from recv_queue
+    + parse message
+    + call tools
+    + send message to send_queue
+  - tools
+    + chat
+    + tools
+    + prompt
+    + timer
+    + interruption
+    + conversation history optimization
+    + send message onbehalf of user
+  - long term memory
+  - short term memory
+
+Survival pressure
+  - first: implement functions(capability), may use alternative complex implementation
+  - second: simplify functions, due to efficiency, faster and less resource consuming wins.
+  - resource constraint, physical constraint.
+  - let GPT to manage the resources, tunable through prompt.
+
+Give me some critical feedbacks on this design.
+
+# useful for tools
+https://api.python.langchain.com/en/latest/anthropic/chat_models/langchain_anthropic.chat_models.ChatAnthropic.html
+
+mcp with langchain
+https://github.com/rectalogic/langchain-mcp/blob/main/src/langchain_mcp/toolkit.py
+https://github.com/rectalogic/langchain-mcp/blob/8fa8445a24755bf91789f52718c32361ed916f46/tests/demo.py#L34-L43
+
+# langchain examples
+https://python.langchain.com/docs/integrations/chat/anthropic/
+
+# mcp repo
+https://github.com/modelcontextprotocol
+
+# personal assistant
+https://github.com/bearlike/Personal-Assistant/blob/main/prompts/action-planner.txt
+
+# longterm memory
+https://www.goodai.com/introducing-goodai-ltm-benchmark/
+https://www.goodai.com/goodai-ltm-benchmark-update2/
+https://github.com/GoodAI/charlie-mnemonic
+
+
