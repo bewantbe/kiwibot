@@ -5,12 +5,6 @@ import queue
 import time
 import copy
 
-def GetTimeStamp():
-    """return like '2025-01-14T07:03:43.273'"""
-    t = time.time()
-    ms = int((t - int(t)) * 1000)
-    return time.strftime('%Y-%m-%dT%H:%M:%S.', time.localtime(t)) + f"{ms:03d}"
-
 class MessageRouter(threading.Thread):
     def __init__(self, recv_queue, send_queue):
         super().__init__()
@@ -60,17 +54,14 @@ class MessageRouter(threading.Thread):
             self.sender_name = self.message_dealer.name
 
     def _single_response(self, msg):
-        response = copy.deepcopy(msg)
-        response['content']['text'] = self.message_dealer(msg['content']['text'])
-        response['timestamp'] = GetTimeStamp()
-        response['sender_id'] = self.sender_name
+        response = self.message_dealer(msg)
         return response
 
     def _action_then_response(self, msg):
         response = copy.deepcopy(msg)
         todo = msg['content']['text']
         if todo == 'time':
-            response['content']['text'] = f"Time now: {GetTimeStamp()}"
+            response['content']['text'] = f"Time now: {time.strftime('%Y-%m-%d %H:%M:%S')}"
         return response
 
     def run(self):
