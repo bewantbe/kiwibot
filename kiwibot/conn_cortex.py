@@ -7,6 +7,9 @@ from langchain_anthropic import ChatAnthropic
 
 class MessageDealer:
     """dealing with messages, like cortex in brain"""
+
+    name = 'Kiwi'
+
     def __init__(self, anthropic_api_key):
         # model list: 
         # param: https://api.python.langchain.com/en/latest/anthropic/chat_models/langchain_anthropic.chat_models.ChatAnthropic.html
@@ -14,6 +17,8 @@ class MessageDealer:
         # claude-3-5-haiku-latest, claude-3-5-sonnet-latest, claude-3-5-sonnet-20241022
         self.llm = ChatAnthropic(model="claude-3-5-sonnet-latest",
                                  api_key=anthropic_api_key)
+
+        # load historical chats
 
     def deal_message(self, msg):
         messages = [
@@ -23,6 +28,9 @@ class MessageDealer:
         ai_msg = self.llm.invoke(messages)
         return ai_msg.content
     
+    def __call__(self, *args, **kwds):
+        return self.deal_message(*args, **kwds)
+
 # Ref. Build a Chatbot - LangChain
 # https://python.langchain.com/docs/tutorials/chatbot/
 # Ref. Build an Agent

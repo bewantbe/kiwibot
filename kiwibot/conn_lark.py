@@ -25,9 +25,300 @@ from lark_oapi.api.im.v1 import (
     P2ImMessageReceiveV1,
 )
 
-
 # setup logging
 logging.basicConfig(level=logging.INFO)
+
+# ref https://open.feishu.cn/document/server-docs/docs/bitable-v1/bitable-overview
+class FeishuBase:
+    """Interface for Feishu Base API operations"""
+    
+    def __init__(self, client):
+        """Initialize with a lark client instance"""
+        self.client = client
+        self.base_url = "https://open.feishu.cn/open-apis/bitable/v1"
+    
+    # Error handling and request methods
+    def _handle_error_response(self, response):
+        """Handle error responses from the API"""
+        if response.get('code') != 0:  # Feishu API uses code 0 for success
+            error_msg = response.get('msg', 'Unknown error')
+            error_code = response.get('code')
+            logging.error(f"API Error {error_code}: {error_msg}")
+            raise Exception(f"API Error {error_code}: {error_msg}")
+        return response
+
+    def _make_request(self, method, endpoint, params=None, json_data=None):
+        """Make HTTP request to Feishu Base API with improved error handling"""
+        url = f"{self.base_url}{endpoint}"
+        headers = {
+            'Authorization': f'Bearer {self.client.tenant_access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        try:
+            response = requests.request(
+                method=method,
+                url=url,
+                headers=headers,
+                params=params,
+                json=json_data
+            )
+            response.raise_for_status()
+            return self._handle_error_response(response.json())
+        except requests.exceptions.RequestException as e:
+            logging.error(f"API request failed: {str(e)}")
+            if hasattr(e.response, 'json'):
+                try:
+                    error_data = e.response.json()
+                    logging.error(f"Error details: {json.dumps(error_data, indent=2)}")
+                except:
+                    pass
+            raise
+    
+    # App level operations
+    def get_app_info(self, app_token):
+        """Get Base app information"""
+        return self._make_request('GET', f'/apps/{app_token}')
+
+    def update_app_info(self, app_token, name=None, description=None):
+        """Update Base app information"""
+        data = {}
+        if name:
+            data['name'] = name
+        if description:
+            data['description'] = description
+        return self._make_request('PUT', f'/apps/{app_token}', json_data=data)
+
+    # Table operations
+    def list_tables(self, app_token, page_size=100, page_token=None):
+        """List all tables in a Base app"""
+        params = {'page_size': page_size}
+        if page_token:
+            params['page_token'] = page_token
+        return self._make_request('GET', f'/apps/{app_token}/tables', params=params)
+
+    def create_table(self, app_token, name, description=None, fields=None):
+        """Create a new table in Base app"""
+        data = {'name': name}
+        if description:
+            data['description'] = description
+        if fields:
+            data['fields'] = fields
+        return self._make_request('POST', f'/apps/{app_token}/tables', json_data=data)
+
+    def delete_table(self, app_token, table_id):
+        """Delete a table from Base app"""
+        return self._make_request('DELETE', f'/apps/{app_token}/tables/{table_id}')
+
+    # Record operations
+    def list_records(self, app_token, table_id, view_id=None, page_size=100, page_token=None):
+        """List records in a table"""
+        params = {'page_size': page_size}
+        if view_id:
+            params['view_id'] = view_id
+        if page_token:
+            params['page_token'] = page_token
+        return self._make_request('GET', f'/apps/{app_token}/tables/{table_id}/records', params=params)
+
+    def create_record(self, app_token, table_id, fields):
+        """Create a new record in a table"""
+        data = {'fields': fields}
+        return self._make_request('POST', f'/apps/{app_token}/tables/{table_id}/records', json_data=data)
+
+    def update_record(self, app_token, table_id, record_id, fields):
+        """Update an existing record"""
+        data = {'fields': fields}
+        return self._make_request('PUT', f'/apps/{app_token}/tables/{table_id}/records/{record_id}', json_data=data)
+
+    def delete_record(self, app_token, table_id, record_id):
+        """Delete a record from a table"""
+        return self._make_request('DELETE', f'/apps/{app_token}/tables/{table_id}/records/{record_id}')
+
+    def batch_create_records(self, app_token, table_id, records):
+        """Create multiple records in a table"""
+        data = {'records': records}
+        return self._make_request('POST', f'/apps/{app_token}/tables/{table_id}/records/batch_create', json_data=data)
+
+    def batch_update_records(self, app_token, table_id, records):
+        """Update multiple records in a table"""
+        data = {'records': records}
+        return self._make_request('POST', f'/apps/{app_token}/tables/{table_id}/records/batch_update', json_data=data)
+
+    def batch_delete_records(self, app_token, table_id, record_ids):
+        """Delete multiple records from a table"""
+        data = {'records': [{'record_id': rid} for rid in record_ids]}
+        return self._make_request('POST', f'/apps/{app_token}/tables/{table_id}/records/batch_delete', json_data=data)
+
+    def search_records(self, app_token, table_id, filter_exp=None, sort=None, view_id=None, page_size=100, page_token=None):
+        """Search records with filtering and sorting
+        
+        Args:
+            app_token: Base app token
+            table_id: Table ID
+            filter_exp: Filter expression following Feishu Base filter syntax
+            sort: List of fields to sort by, each item being a dict with 'field_name' and 'order' ('asc' or 'desc')
+            view_id: Optional view ID to filter records
+            page_size: Number of records per page
+            page_token: Token for pagination
+        """
+        params = {'page_size': page_size}
+        if view_id:
+            params['view_id'] = view_id
+        if page_token:
+            params['page_token'] = page_token
+        if filter_exp:
+            params['filter'] = filter_exp
+        if sort:
+            params['sort'] = json.dumps(sort)
+        return self._make_request('GET', f'/apps/{app_token}/tables/{table_id}/records', params=params)
+
+    # Dashboard operations
+    def list_dashboards(self, app_token, page_size=100, page_token=None):
+        """List all dashboards in a Base app"""
+        params = {'page_size': page_size}
+        if page_token:
+            params['page_token'] = page_token
+        return self._make_request('GET', f'/apps/{app_token}/dashboards', params=params)
+
+    def get_dashboard(self, app_token, dashboard_id):
+        """Get dashboard information"""
+        return self._make_request('GET', f'/apps/{app_token}/dashboards/{dashboard_id}')
+
+    # Convenience methods
+    def get_record_by_field_value(self, app_token, table_id, field_name, field_value):
+        """Get a record by matching a field value
+        
+        Args:
+            app_token: Base app token
+            table_id: Table ID
+            field_name: Name of the field to match
+            field_value: Value to match against
+        
+        Returns:
+            First record that matches the field value, or None if not found
+        """
+        filter_exp = f'CurrentValue.[{field_name}] = "{field_value}"'
+        result = self.search_records(app_token, table_id, filter_exp=filter_exp, page_size=1)
+        records = result.get('data', {}).get('items', [])
+        return records[0] if records else None
+
+    def get_or_create_record(self, app_token, table_id, field_name, field_value, additional_fields=None):
+        """Get a record by field value or create it if it doesn't exist
+        
+        Args:
+            app_token: Base app token
+            table_id: Table ID
+            field_name: Name of the field to match
+            field_value: Value to match against
+            additional_fields: Additional fields to set if creating a new record
+        
+        Returns:
+            Tuple of (record, created) where created is True if a new record was created
+        """
+        record = self.get_record_by_field_value(app_token, table_id, field_name, field_value)
+        if record:
+            return record, False
+            
+        fields = {field_name: field_value}
+        if additional_fields:
+            fields.update(additional_fields)
+        new_record = self.create_record(app_token, table_id, fields)
+        return new_record, True
+
+    # Field operations
+    def list_fields(self, app_token, table_id, view_id=None, page_size=100, page_token=None):
+        """List all fields in a table"""
+        params = {'page_size': page_size}
+        if view_id:
+            params['view_id'] = view_id
+        if page_token:
+            params['page_token'] = page_token
+        return self._make_request('GET', f'/apps/{app_token}/tables/{table_id}/fields', params=params)
+
+    def create_field(self, app_token, table_id, field_name, field_type, property=None):
+        """Create a new field in a table"""
+        data = {
+            'field_name': field_name,
+            'type': field_type
+        }
+        if property:
+            data['property'] = property
+        return self._make_request('POST', f'/apps/{app_token}/tables/{table_id}/fields', json_data=data)
+
+    def update_field(self, app_token, table_id, field_id, field_name=None, property=None):
+        """Update an existing field"""
+        data = {}
+        if field_name:
+            data['field_name'] = field_name
+        if property:
+            data['property'] = property
+        return self._make_request('PUT', f'/apps/{app_token}/tables/{table_id}/fields/{field_id}', json_data=data)
+
+    def delete_field(self, app_token, table_id, field_id):
+        """Delete a field from a table"""
+        return self._make_request('DELETE', f'/apps/{app_token}/tables/{table_id}/fields/{field_id}')
+
+    # View operations
+    def list_views(self, app_token, table_id):
+        """List all views in a table"""
+        return self._make_request('GET', f'/apps/{app_token}/tables/{table_id}/views')
+
+    def create_view(self, app_token, table_id, view_name, view_type="grid"):
+        """Create a new view in a table"""
+        data = {
+            'view_name': view_name,
+            'view_type': view_type
+        }
+        return self._make_request('POST', f'/apps/{app_token}/tables/{table_id}/views', json_data=data)
+
+    def delete_view(self, app_token, table_id, view_id):
+        """Delete a view from a table"""
+        return self._make_request('DELETE', f'/apps/{app_token}/tables/{table_id}/views/{view_id}')
+
+    # Role operations
+    def list_roles(self, app_token, page_size=100, page_token=None):
+        """List all roles in a Base app"""
+        params = {'page_size': page_size}
+        if page_token:
+            params['page_token'] = page_token
+        return self._make_request('GET', f'/apps/{app_token}/roles', params=params)
+
+    def create_role(self, app_token, role_name, table_permissions=None):
+        """Create a new role"""
+        data = {'role_name': role_name}
+        if table_permissions:
+            data['table_permissions'] = table_permissions
+        return self._make_request('POST', f'/apps/{app_token}/roles', json_data=data)
+
+    def update_role(self, app_token, role_id, role_name=None, table_permissions=None):
+        """Update an existing role"""
+        data = {}
+        if role_name:
+            data['role_name'] = role_name
+        if table_permissions:
+            data['table_permissions'] = table_permissions
+        return self._make_request('PUT', f'/apps/{app_token}/roles/{role_id}', json_data=data)
+
+    def delete_role(self, app_token, role_id):
+        """Delete a role"""
+        return self._make_request('DELETE', f'/apps/{app_token}/roles/{role_id}')
+
+    # Form operations
+    def get_form(self, app_token, table_id, view_id):
+        """Get form information for a view"""
+        return self._make_request('GET', f'/apps/{app_token}/tables/{table_id}/forms/{view_id}')
+
+    def create_form_record(self, app_token, table_id, view_id, fields):
+        """Create a record through a form view
+        
+        Args:
+            app_token: Base app token
+            table_id: Table ID
+            view_id: Form view ID
+            fields: Dictionary of field values
+        """
+        data = {'fields': fields}
+        return self._make_request('POST', f'/apps/{app_token}/tables/{table_id}/forms/{view_id}/submit', json_data=data)
 
 def group_bot_gen_sign(timestamp, secret):
     # Splicing timestamp and secret
