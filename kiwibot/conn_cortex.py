@@ -29,7 +29,7 @@ class MessageDealer:
 
         self.chat_history = self._get_historical_msg()
 
-    def _get_historical_msg():
+    def _get_historical_msg(self):
         # load historical chats from log.json
         s = '[' + open('log.json', encoding='utf-8').read()
         s = s.replace('}\n{', '},\n{') + ']'
@@ -44,6 +44,8 @@ class MessageDealer:
             if chat_id not in chat_history:
                 chat_history[chat_id] = []
             chat_history[chat_id].append(msg)
+
+        # TODO: if user explicitly asks to start a new chat, clear the chat history
 
         # print number of messages in each chat
         for chat_id, msgs in chat_history.items():
