@@ -3,6 +3,7 @@
 import os
 import copy
 import time
+import json
 from dotenv import load_dotenv
 
 from langchain_anthropic import ChatAnthropic
@@ -26,7 +27,29 @@ class MessageDealer:
         self.llm = ChatAnthropic(model="claude-3-5-sonnet-latest",
                                  api_key=anthropic_api_key)
 
-        # load historical chats
+        self.chat_history = self._get_historical_msg()
+
+    def _get_historical_msg():
+        # load historical chats from log.json
+        s = '[' + open('log.json', encoding='utf-8').read()
+        s = s.replace('}\n{', '},\n{') + ']'
+        print(s[0:1000])
+        print(s[-500:])
+        chat_history_all = json.loads(s)
+        
+        # group messages by chat_id
+        chat_history = {}
+        for msg in chat_history_all:
+            chat_id = msg['chat_id']
+            if chat_id not in chat_history:
+                chat_history[chat_id] = []
+            chat_history[chat_id].append(msg)
+
+        # print number of messages in each chat
+        for chat_id, msgs in chat_history.items():
+            print(f"Chat {chat_id} has {len(msgs)} messages.")
+
+        return chat_history
 
     def deal_message(self, msg_json):
         response = {
@@ -41,10 +64,22 @@ class MessageDealer:
         }
         msg = msg_json['content']['text']
 
-        messages = [
-            ("system", "You are a helpful assistant."),
-            ("human", msg)
-        ]
+        # load recent history
+        chat_id = msg_json['chat_id']
+        if chat_id in self.chat_history:
+            history = self.chat_history[chat_id][-3:]
+        else:
+            history = []
+
+        # add recent messages to the history
+        messages = [("system", "You are a helpful assistant.")]
+        for past_msg in history:
+            if past_msg['sender_id'] == self.name:
+                messages.append(("ai", past_msg['content']['text']))
+            else:
+                messages.append(("human", past_msg['content']['text']))
+
+        messages.append(("human", msg))
         ai_msg = self.llm.invoke(messages)
         response['content']['text'] = ai_msg.content
         response['timestamp'] = GetTimeStamp()
