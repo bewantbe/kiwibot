@@ -25,7 +25,7 @@ from lark_oapi.api.contact.v3 import (
     GetUserRequest, GetUserResponse,
 )
 
-from utils import (
+from kiwibot.utils import (
     GetISOTimestamp,
 )
 

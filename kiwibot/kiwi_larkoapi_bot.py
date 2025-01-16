@@ -5,12 +5,12 @@ import time
 import json
 from dotenv import load_dotenv
 
-from conn_lark import (
+from kiwibot.conn_lark import (
     FeishuPortal,
     simple_msg_by,
 )
-from conn_router import MessageRouter
-from conn_cortex import MessageDealer
+from kiwibot.conn_router import MessageRouter
+from kiwibot.conn_cortex import MessageDealer
 
 def main_test_echo():
     print('Starting echo bot')
