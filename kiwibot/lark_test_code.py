@@ -240,8 +240,9 @@ def start_echo_bot(client):
 
 def old_main0():
     # Webhook:
-    webhook_url = 'https://open.feishu.cn/open-apis/bot/v2/hook/260e63f5-d8bc-4ef7-a058-8cb483d6b42d'
-    webhook_secret = 'HgPrBKh4dRTIsa0j4feeRh'
+    load_dotenv()
+    webhook_url = os.getenv('GROUP_WEBHOOK_URL')
+    webhook_secret = os.getenv('GROUP_WEBHOOK_SECRET')
 
     if 0:
         # Send message
