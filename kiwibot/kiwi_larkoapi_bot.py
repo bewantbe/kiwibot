@@ -10,7 +10,7 @@ from conn_lark import (
 from conn_router import MessageRouter
 from conn_cortex import MessageDealer
 
-def main_test1():
+def main_feishu_echo():
     load_dotenv()
     print('Start main')
 
@@ -29,6 +29,7 @@ def main_test1():
     time.sleep(1)
 
 def main_test_echo():
+    print('Starting echo bot')
     load_dotenv()
     app_id = os.getenv('APP_ID')
     app_secret = os.getenv('APP_SECRET')
@@ -40,10 +41,10 @@ def main_test_echo():
     msg_router.join()  # start message-agent loop
 
 def main_test2():
+    print('Starting AI chat bot')
     load_dotenv()
-    print('Start main')
 
-    # init feishu
+    # init feishu connection
     app_id = os.getenv('APP_ID')
     app_secret = os.getenv('APP_SECRET')
     feishu_portal = FeishuPortal(app_id, app_secret, "log.json")
@@ -51,15 +52,15 @@ def main_test2():
     # init message router
     msg_router = MessageRouter(feishu_portal.recv_queue, feishu_portal.send_queue)
     
-    # init agent
+    # init AI agent
     anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
     msg_dealer = MessageDealer(anthropic_api_key)
     msg_router.set_message_dealer(msg_dealer)
 
-    msg_router.start()
     #msg_router.register_timed_event(15, 'eddy', 'time')  # cost extra ctrl-c
 
     # start message-agent loop
+    msg_router.start()
     msg_router.join()
 
 if __name__ == '__main__':
