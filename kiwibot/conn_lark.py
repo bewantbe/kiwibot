@@ -25,7 +25,6 @@ from lark_oapi.api.contact.v3 import (
     GetUserRequest, GetUserResponse,
 )
 
-
 from utils import (
     GetISOTimestamp,
 )
@@ -368,11 +367,10 @@ class FeishuChatTool:
     def send_message(self, msg):
         """Send message to user or group
         Deal with message depends on the type"""
-        if msg['chat_type'] == "p2p":
+        if msg['message_id'] is None:
             response, call_name = self.send_message_plain(msg)
         else:
             # replay to message
-            # msg['chat_type'] == 'group'
             response, call_name = self.send_message_reply(msg)
 
         if not response.success():
@@ -415,9 +413,22 @@ class FeishuChatTool:
             "message_id": message.message_id,
             "message_type": message.message_type,
             "content": json.loads(message.content),
+            "mentions": None,
             "timestamp": GetISOTimestamp(int(message.create_time)/1000),
             "update_time": GetISOTimestamp(int(message.update_time)/1000),
         }
+        if message.mentions is not None:
+            msg["mentions"] = [
+                {
+                    'key': it.key,
+                    'name': it.name,
+                    'tenant_key': it.tenant_key,
+                    'id': {
+                        'open_id': it.id.open_id,
+                        'union_id': it.id.union_id,
+                        'user_id': it.id.user_id,
+                    }
+                } for it in message.mentions]
         return msg
 
     def get_group_info(self, chat_id):
@@ -484,13 +495,20 @@ class FeishuChatTool:
         response = self.get_user_info(user_id)
         return response.data.user.name
 
-def simple_msg_by(ref_msg, sender, text):
+def is_at_user(msg, user_name):
+    return msg['mentions'] is not None \
+        and len(msg['mentions']) > 0 \
+        and msg['mentions'][0]['name'] == user_name
+
+def simple_msg_by(ref_msg, sender, text, is_reply = None):
+    if is_reply is None:
+        is_reply = is_at_user(ref_msg, sender)
     ts = GetISOTimestamp()
     response = {
         'chat_id': ref_msg['chat_id'],        # reply to this p2p chat
         'chat_type': ref_msg['chat_type'],
         'sender_id': sender,                  # only for log
-        'message_id': ref_msg['message_id'],  # reply to this message in group chat
+        'message_id': ref_msg['message_id'] if is_reply else None,  # reply to this message in group chat
         'message_type': 'text',
         'content': {
             'text': text

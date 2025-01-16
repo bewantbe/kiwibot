@@ -10,7 +10,10 @@ from langchain_anthropic import ChatAnthropic
 from kiwibot.utils import (
     GetISOTimestamp,
 )
-from kiwibot.conn_lark import simple_msg_by
+from kiwibot.conn_lark import (
+    simple_msg_by,
+    is_at_user,
+)
 
 class MessageDealer:
     """dealing with messages, like the cortex in brain"""

@@ -21,7 +21,7 @@ def main_test_echo():
 
     msg_router = MessageRouter(feishu_portal.recv_queue, feishu_portal.send_queue)
     msg_router.set_message_dealer(
-        lambda m: simple_msg_by(m, 'bot', "Received: " + json.dumps(m)))
+        lambda m: simple_msg_by(m, 'Kiwi', "Received: " + json.dumps(m)))
     msg_router.start()
     msg_router.join()  # start message-agent loop
 
