@@ -487,22 +487,46 @@ class FeishuChatTool:
         lark.logger.info(lark.JSON.marshal(response.data, indent=4))
         return response
 
+    def _load_name_cache(self):
+        try:
+            with open('name_cache.json', 'r') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {'groups': {}, 'users': {}}
+
+    def _save_name_cache(self, cache):
+        with open('name_cache.json', 'w') as f:
+            json.dump(cache, f, indent=4)
+
     def get_group_name(self, chat_id):
-        # TODO: cache group name in file
+        cache = self._load_name_cache()
+        if chat_id in cache['groups']:
+            return cache['groups'][chat_id]
+        
         response = self.get_group_info(chat_id)
-        return response.data.name
+        name = response.data.name
+        cache['groups'][chat_id] = name
+        self._save_name_cache(cache)
+        return name
 
     def get_user_name(self, user_id):
         if not user_id.startswith('ou_'):
             return user_id
-        # cache user name in file
+            
+        cache = self._load_name_cache()
+        if user_id in cache['users']:
+            return cache['users'][user_id]
+        
         response = self.get_user_info(user_id)
-        return response.data.user.name
+        name = response.data.user.name
+        cache['users'][user_id] = name
+        self._save_name_cache(cache)
+        return name
 
     def get_plain_msg_text(self, msg):
         # replace @ to name
         text = msg['content']['text']
-        if msg['mentions'] is not None:
+        if msg.get('mentions') is not None:
             for mention in msg['mentions']:
                 text = text.replace(f"{mention['key']}", mention['name'])
         # in a group chat, add user name to the text

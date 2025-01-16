@@ -2,6 +2,7 @@
 
 import os
 import copy
+import time
 import json
 
 from dotenv import load_dotenv
@@ -101,7 +102,9 @@ class MessageDealer:
         # system prompt
         messages = [("system",
             f"You are a helpful assistant, nicknamed: {self.name}." + \
-            " " + self.gen_prompt(msg_json))]
+            " " + self.gen_prompt(msg_json) + \
+            " " + f"local time is {time.ctime()}."
+            )]
 
         conv = self.tool_dict['chattool'].get_plain_msg_text
 
