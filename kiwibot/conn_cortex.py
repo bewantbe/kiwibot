@@ -2,39 +2,36 @@
 
 import os
 import copy
-import time
 import json
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 
-def GetTimeStamp():
-    """return like '2025-01-14T07:03:43.273'"""
-    t = time.time()
-    ms = int((t - int(t)) * 1000)
-    return time.strftime('%Y-%m-%dT%H:%M:%S.', time.localtime(t)) + f"{ms:03d}"
+from .utils import (
+    GetISOTimestamp,
+)
 
 class MessageDealer:
-    """dealing with messages, like cortex in brain"""
+    """dealing with messages, like the cortex in brain"""
 
-    name = 'Kiwi'
+    name = 'Kiwi'   # name will appear in message log
 
-    def __init__(self, anthropic_api_key):
-        # model list: 
+    def __init__(self, anthropic_api_key, chat_database_path):
+        """Init connection to Anthropic, load historical messages"""
         # param: https://api.python.langchain.com/en/latest/anthropic/chat_models/langchain_anthropic.chat_models.ChatAnthropic.html
         # basic usages: https://python.langchain.com/docs/integrations/chat/anthropic/
+        # model list: 
         # claude-3-5-haiku-latest, claude-3-5-sonnet-latest, claude-3-5-sonnet-20241022
         self.llm = ChatAnthropic(model="claude-3-5-sonnet-latest",
                                  api_key=anthropic_api_key)
 
-        self.chat_history = self._get_historical_msg()
+        self.chat_database_path = chat_database_path
+        self.chat_history = self._get_historical_msg(chat_database_path)
 
-    def _get_historical_msg(self):
-        # load historical chats from log.json
-        s = '[' + open('log.json', encoding='utf-8').read()
-        s = s.replace('}\n{', '},\n{') + ']'
-        print(s[0:1000])
-        print(s[-500:])
+    def _get_historical_msg(self, chat_database_path):
+        """ load historical chats from database """
+        s = open(chat_database_path, encoding='utf-8').read()
+        s = '[' + s.replace('}\n{', '},\n{') + ']'
         chat_history_all = json.loads(s)
         
         # group messages by chat_id
@@ -44,8 +41,6 @@ class MessageDealer:
             if chat_id not in chat_history:
                 chat_history[chat_id] = []
             chat_history[chat_id].append(msg)
-
-        # TODO: if user explicitly asks to start a new chat, clear the chat history
 
         # print number of messages in each chat
         for chat_id, msgs in chat_history.items():
@@ -66,6 +61,8 @@ class MessageDealer:
         }
         msg = msg_json['content']['text']
 
+        # TODO: if user explicitly asks to start a new chat, clear the chat history
+
         # load recent history
         chat_id = msg_json['chat_id']
         if chat_id in self.chat_history:
@@ -84,7 +81,7 @@ class MessageDealer:
         messages.append(("human", msg))
         ai_msg = self.llm.invoke(messages)
         response['content']['text'] = ai_msg.content
-        response['timestamp'] = GetTimeStamp()
+        response['timestamp'] = GetISOTimestamp()
         response['update_time'] = response['timestamp']
         return response
     
