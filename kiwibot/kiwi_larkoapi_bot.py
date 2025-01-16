@@ -2,10 +2,12 @@
 
 import os
 import time
+import json
 from dotenv import load_dotenv
 
 from conn_lark import (
     FeishuPortal,
+    simple_msg_by,
 )
 from conn_router import MessageRouter
 from conn_cortex import MessageDealer
@@ -18,7 +20,8 @@ def main_test_echo():
     feishu_portal = FeishuPortal(app_id, app_secret, "log.json")
 
     msg_router = MessageRouter(feishu_portal.recv_queue, feishu_portal.send_queue)
-    msg_router.set_message_dealer(lambda t: "Received text: " + t)
+    msg_router.set_message_dealer(
+        lambda m: simple_msg_by(m, 'bot', "Received: " + json.dumps(m)))
     msg_router.start()
     msg_router.join()  # start message-agent loop
 
@@ -47,6 +50,6 @@ def main_ai_assistant():
     msg_router.join()
 
 if __name__ == '__main__':
-    #main_test_echo()
-    main_ai_assistant()
+    main_test_echo()
+    #main_ai_assistant()
     # TODO: allow one Ctrl-C to terminate the program

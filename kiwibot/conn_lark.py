@@ -332,7 +332,7 @@ class FeishuChatTool:
         self.message_recv_cb = None
         self.lark_log_level = feishu_log_level
     
-    def send_message_p2p(self, msg):
+    def send_message_plain(self, msg):
         content = json.dumps(msg['content'])
         request = (
             CreateMessageRequest.builder()
@@ -340,7 +340,7 @@ class FeishuChatTool:
             .request_body(
                 CreateMessageRequestBody.builder()
                 .receive_id(msg['chat_id'])
-                .msg_type("text")
+                .msg_type(msg['message_type'])
                 .content(content)
                 .build()
             )
@@ -349,7 +349,7 @@ class FeishuChatTool:
         response = self.client.im.v1.chat.create(request)
         return response, "client.im.v1.chat.create failed"
     
-    def send_message_group(self, msg):
+    def send_message_reply(self, msg):
         content = json.dumps(msg['content'])
         request: ReplyMessageRequest = (
             ReplyMessageRequest.builder()
@@ -357,7 +357,7 @@ class FeishuChatTool:
             .request_body(
                 ReplyMessageRequestBody.builder()
                 .content(content)
-                .msg_type("text")
+                .msg_type(msg['message_type'])
                 .build()
             )
             .build()
@@ -369,10 +369,11 @@ class FeishuChatTool:
         """Send message to user or group
         Deal with message depends on the type"""
         if msg['chat_type'] == "p2p":
-            response, call_name = self.send_message_p2p(msg)
+            response, call_name = self.send_message_plain(msg)
         else:
-            # replay the @bot
-            response, call_name = self.send_message_group(msg)
+            # replay to message
+            # msg['chat_type'] == 'group'
+            response, call_name = self.send_message_reply(msg)
 
         if not response.success():
             raise Exception(
@@ -407,16 +408,17 @@ class FeishuChatTool:
     def cb_message_to_chat_message(self, payload):
         """Convert P2ImMessageReceiveV1 to message-like dict"""
         message = payload.event.message
-        return {
-            "timestamp": GetISOTimestamp(int(message.create_time)/1000),
-            "chat_type": message.chat_type,
-            "message_type": message.message_type,
+        msg = {
             "chat_id": message.chat_id,
-            "message_id": message.message_id,
+            "chat_type": message.chat_type,
             "sender_id": payload.event.sender.sender_id.open_id,
+            "message_id": message.message_id,
+            "message_type": message.message_type,
+            "content": json.loads(message.content),
+            "timestamp": GetISOTimestamp(int(message.create_time)/1000),
             "update_time": GetISOTimestamp(int(message.update_time)/1000),
-            "content": json.loads(message.content)
         }
+        return msg
 
     def get_group_info(self, chat_id):
         """Get group info"""
@@ -485,11 +487,11 @@ class FeishuChatTool:
 def simple_msg_by(ref_msg, sender, text):
     ts = GetISOTimestamp()
     response = {
-        'chat_type': ref_msg['chat_type'],
         'chat_id': ref_msg['chat_id'],        # reply to this p2p chat
+        'chat_type': ref_msg['chat_type'],
         'sender_id': sender,                  # only for log
-        'message_type': 'text',
         'message_id': ref_msg['message_id'],  # reply to this message in group chat
+        'message_type': 'text',
         'content': {
             'text': text
         },
@@ -520,7 +522,7 @@ class FeishuPortal:
     def _on_message_received(self, data: P2ImMessageReceiveV1):
         msg = self.chattool.cb_message_to_chat_message(data)
         self._log_communication(msg)
-        if msg["content"]["text"] == "whoami":
+        if msg["content"].get("text") == "whoami":
             # special rule
             name = self.chattool.get_user_name(msg["sender_id"])
             msg = simple_msg_by(msg, 'bot', f"You are {name}")
@@ -542,7 +544,8 @@ class FeishuPortal:
         def send_from_queue():
             while True:
                 msg = self.send_queue.get()
-                self.send_message(msg)
+                if msg is not None:
+                    self.send_message(msg)
                 self.send_queue.task_done()
 
         thread = threading.Thread(target=send_from_queue)

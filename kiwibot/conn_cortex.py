@@ -31,6 +31,9 @@ class MessageDealer:
 
     def _get_historical_msg(self, chat_database_path):
         """ load historical chats from database """
+        if chat_database_path is None:
+            return {}
+
         s = open(chat_database_path, encoding='utf-8').read()
         s = '[' + s.replace('}\n{', '},\n{') + ']'
         chat_history_all = json.loads(s)
