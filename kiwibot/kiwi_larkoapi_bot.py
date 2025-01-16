@@ -33,6 +33,9 @@ def main_ai_assistant():
     app_id = os.getenv('APP_ID')
     app_secret = os.getenv('APP_SECRET')
     chat_log_path = 'log.json'
+    if not os.path.exists(chat_log_path):
+        with open(chat_log_path, 'w') as f:
+            pass
     feishu_portal = FeishuPortal(app_id, app_secret, chat_log_path)
 
     # init message router
