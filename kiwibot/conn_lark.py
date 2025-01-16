@@ -493,6 +493,8 @@ class FeishuChatTool:
         return response.data.name
 
     def get_user_name(self, user_id):
+        if not user_id.startswith('ou_'):
+            return user_id
         # cache user name in file
         response = self.get_user_info(user_id)
         return response.data.user.name
