@@ -497,6 +497,18 @@ class FeishuChatTool:
         response = self.get_user_info(user_id)
         return response.data.user.name
 
+    def get_plain_msg_text(self, msg):
+        # replace @ to name
+        text = msg['content']['text']
+        if msg['mentions'] is not None:
+            for mention in msg['mentions']:
+                text = text.replace(f"{mention['key']}", mention['name'])
+        # in a group chat, add user name to the text
+        if msg['chat_type'] == 'group':
+            user_name = self.get_user_name(msg['sender_id'])
+            text = f"{user_name}: {text}"
+        return text
+
 def is_at_user(msg, user_name):
     return msg['mentions'] is not None \
         and len(msg['mentions']) > 0 \

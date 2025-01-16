@@ -74,10 +74,14 @@ class MessageDealer:
             group_name = self.tool_dict['chattool'].get_group_name(msg_json['chat_id'])
             return f"You are chatting in a group chat named {group_name}."
 
-    def deal_message(self, msg_json):
-        if not self.is_need_to_reply(msg_json):
-            return None
+    def append_to_history(self, msg_json):
+        chat_id = msg_json['chat_id']
+        if chat_id not in self.chat_history:
+            self.chat_history[chat_id] = []
+        self.chat_history[chat_id].append(msg_json)
+        # somewhere else will talk case of the history file
 
+    def get_history_content(self, msg_json, max_num=3):
         # load recent history
         chat_id = msg_json['chat_id']
         if chat_id in self.chat_history:
@@ -86,21 +90,35 @@ class MessageDealer:
             history = []
 
         # TODO: if user explicitly asks to start a new chat, clear the chat history
+        return history
 
-        # add recent messages to the history
+    def deal_message(self, msg_json):
+        """deal with the message, return response"""
+        if not self.is_need_to_reply(msg_json):
+            self.append_to_history(msg_json)
+            return None
+
+        # system prompt
         messages = [("system",
             f"You are a helpful assistant, nicknamed: {self.name}." + \
             " " + self.gen_prompt(msg_json))]
+
+        conv = self.tool_dict['chattool'].get_plain_msg_text
+
+        # add context
+        history = self.get_history_content(msg_json)
         for past_msg in history:
             if past_msg['sender_id'] == self.name:
-                messages.append(("ai", past_msg['content']['text']))
+                messages.append(("ai", conv(past_msg)))
             else:
-                messages.append(("human", past_msg['content']['text']))
+                messages.append(("human", conv(past_msg)))    # TODO: support rich text, image etc.
 
-        msg = msg_json['content']['text']
+        msg = conv(msg_json)
         messages.append(("human", msg))
         ai_msg = self.llm.invoke(messages)
         response = simple_msg_by(msg_json, self.name, ai_msg.content)
+        self.append_to_history(msg_json)
+        self.append_to_history(response)
         return response
     
     def __call__(self, *args, **kwds):
