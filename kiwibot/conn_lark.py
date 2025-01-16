@@ -487,11 +487,13 @@ class FeishuChatTool:
         lark.logger.info(lark.JSON.marshal(response.data, indent=4))
         return response
 
-    def get_chat_name(self, chat_id):
+    def get_group_name(self, chat_id):
+        # TODO: cache group name in file
         response = self.get_group_info(chat_id)
         return response.data.name
 
     def get_user_name(self, user_id):
+        # cache user name in file
         response = self.get_user_info(user_id)
         return response.data.user.name
 

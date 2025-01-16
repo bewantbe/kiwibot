@@ -40,7 +40,10 @@ def main_ai_assistant():
     
     # init AI agent
     anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
-    msg_dealer = MessageDealer(anthropic_api_key, chat_log_path)
+    msg_dealer = MessageDealer(anthropic_api_key, chat_log_path, 
+                               {
+                                   'chattool': feishu_portal.chattool,
+                               })
     msg_router.set_message_dealer(msg_dealer)
 
     #msg_router.register_timed_event(15, 'eddy', 'time')  # cost extra ctrl-c
@@ -50,6 +53,6 @@ def main_ai_assistant():
     msg_router.join()
 
 if __name__ == '__main__':
-    main_test_echo()
-    #main_ai_assistant()
+    #main_test_echo()
+    main_ai_assistant()
     # TODO: allow one Ctrl-C to terminate the program

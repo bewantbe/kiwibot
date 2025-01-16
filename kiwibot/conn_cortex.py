@@ -20,7 +20,7 @@ class MessageDealer:
 
     name = 'Kiwi'   # name will appear in message log
 
-    def __init__(self, anthropic_api_key, chat_database_path):
+    def __init__(self, anthropic_api_key, chat_database_path, tool_dict=None):
         """Init connection to Anthropic, load historical messages"""
         # param: https://api.python.langchain.com/en/latest/anthropic/chat_models/langchain_anthropic.chat_models.ChatAnthropic.html
         # basic usages: https://python.langchain.com/docs/integrations/chat/anthropic/
@@ -29,6 +29,7 @@ class MessageDealer:
         self.llm = ChatAnthropic(model="claude-3-5-sonnet-latest",
                                  api_key=anthropic_api_key)
 
+        self.tool_dict = tool_dict
         self.chat_database_path = chat_database_path
         self.chat_history = self._get_historical_msg(chat_database_path)
 
@@ -55,7 +56,28 @@ class MessageDealer:
 
         return chat_history
 
+    def is_need_to_reply(self, msg_json):
+        # if it is from user chat, reply it
+        if msg_json['chat_type'] == 'p2p':
+            return True
+        # if it is from group chat, reply it only when @me
+        if msg_json['chat_type'] == 'group':
+            return is_at_user(msg_json, self.name)
+
+    def gen_prompt(self, msg_json):
+        if self.tool_dict is None:
+            return ''
+        if msg_json['chat_type'] == 'p2p':
+            user_name = self.tool_dict['chattool'].get_user_name(msg_json['sender_id'])
+            return f"You are chatting with {user_name}."
+        if msg_json['chat_type'] == 'group':
+            group_name = self.tool_dict['chattool'].get_group_name(msg_json['chat_id'])
+            return f"You are chatting in a group chat named {group_name}."
+
     def deal_message(self, msg_json):
+        if not self.is_need_to_reply(msg_json):
+            return None
+
         # load recent history
         chat_id = msg_json['chat_id']
         if chat_id in self.chat_history:
@@ -66,7 +88,9 @@ class MessageDealer:
         # TODO: if user explicitly asks to start a new chat, clear the chat history
 
         # add recent messages to the history
-        messages = [("system", "You are a helpful assistant.")]
+        messages = [("system",
+            f"You are a helpful assistant, nicknamed: {self.name}." + \
+            " " + self.gen_prompt(msg_json))]
         for past_msg in history:
             if past_msg['sender_id'] == self.name:
                 messages.append(("ai", past_msg['content']['text']))
