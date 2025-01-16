@@ -17,7 +17,14 @@ from lark_oapi.api.im.v1 import (
     CreateMessageRequest, CreateMessageRequestBody, CreateMessageResponse,
     ReplyMessageRequest, ReplyMessageRequestBody, ReplyMessageResponse,
     P2ImMessageReceiveV1,
+    GetChatResponse, GetChatRequest,
 )
+
+from lark_oapi.api.contact.v3 import (
+    BatchUserResponse, BatchUserRequest,
+    GetUserRequest, GetUserResponse,
+)
+
 
 from utils import (
     GetISOTimestamp,
@@ -411,6 +418,86 @@ class FeishuChatTool:
             "content": json.loads(message.content)
         }
 
+    def get_group_info(self, chat_id):
+        """Get group info"""
+        request: GetChatRequest = GetChatRequest.builder() \
+            .chat_id(chat_id) \
+            .build()
+        response: GetChatResponse = self.client.im.v1.chat.get(request)
+        return response
+
+    def get_user_info_batch(self, user_id_list):
+        """Get user info"""
+        request: BatchUserRequest = BatchUserRequest.builder() \
+            .user_ids(user_id_list) \
+            .user_id_type("open_id") \
+            .department_id_type("open_department_id") \
+            .build()
+
+        # 发起请求
+        response: BatchUserResponse = self.client.contact.v3.user.batch(request)
+
+        # 处理失败返回
+        if not response.success():
+            lark.logger.error(
+                f"client.contact.v3.user.batch failed, code: {response.code},"
+                f"msg: {response.msg},"
+                f"log_id: {response.get_log_id()},"
+                f"resp: \n{json.dumps(json.loads(response.raw.content), indent=4, ensure_ascii=False)}")
+            return
+
+        # 处理业务结果
+        lark.logger.info(lark.JSON.marshal(response.data, indent=4))
+        return response
+
+    def get_user_info(self, user_id):
+        """Get single user info"""
+        request: GetUserRequest = GetUserRequest.builder() \
+            .user_id(user_id) \
+            .user_id_type("open_id") \
+            .department_id_type("open_department_id") \
+            .build()
+
+        # 发起请求
+        response = self.client.contact.v3.user.get(request)
+        # json.loads(response.raw.content)
+        # 处理失败返回
+        if not response.success():
+            lark.logger.error(
+                f"client.contact.v3.user.get failed, code: {response.code},"
+                f"msg: {response.msg},"
+                f"log_id: {response.get_log_id()},"
+                f"resp: \n{json.dumps(json.loads(response.raw.content), indent=4, ensure_ascii=False)}")
+            return
+
+        # 处理业务结果
+        lark.logger.info(lark.JSON.marshal(response.data, indent=4))
+        return response
+
+    def get_chat_name(self, chat_id):
+        response = self.get_group_info(chat_id)
+        return response.data.name
+
+    def get_user_name(self, user_id):
+        response = self.get_user_info(user_id)
+        return response.data.user.name
+
+def simple_msg_by(ref_msg, sender, text):
+    ts = GetISOTimestamp()
+    response = {
+        'chat_type': ref_msg['chat_type'],
+        'chat_id': ref_msg['chat_id'],        # reply to this p2p chat
+        'sender_id': sender,                  # only for log
+        'message_type': 'text',
+        'message_id': ref_msg['message_id'],  # reply to this message in group chat
+        'content': {
+            'text': text
+        },
+        'timestamp': ts,
+        'update_time': ts
+    }
+    return response
+
 class FeishuPortal:
     def __init__(self, app_id, app_secret, log_file):
         self.lark_log_level = lark.LogLevel.DEBUG
@@ -432,8 +519,15 @@ class FeishuPortal:
 
     def _on_message_received(self, data: P2ImMessageReceiveV1):
         msg = self.chattool.cb_message_to_chat_message(data)
-        self.recv_queue.put(msg)
         self._log_communication(msg)
+        if msg["content"]["text"] == "whoami":
+            # special rule
+            name = self.chattool.get_user_name(msg["sender_id"])
+            msg = simple_msg_by(msg, 'bot', f"You are {name}")
+            self.send_message(msg)
+        else:
+            # general chat
+            self.recv_queue.put(msg)
 
     def send_message(self, msg):
         self.chattool.send_message(msg)

@@ -7,9 +7,10 @@ import json
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 
-from .utils import (
+from kiwibot.utils import (
     GetISOTimestamp,
 )
+from kiwibot.conn_lark import simple_msg_by
 
 class MessageDealer:
     """dealing with messages, like the cortex in brain"""
@@ -49,26 +50,14 @@ class MessageDealer:
         return chat_history
 
     def deal_message(self, msg_json):
-        response = {
-            'chat_type': msg_json['chat_type'],
-            'chat_id': msg_json['chat_id'],
-            'sender_id': self.name,
-            'message_type': 'text',
-            'message_id': None,
-            'content': {
-                'text': None
-            }
-        }
-        msg = msg_json['content']['text']
-
-        # TODO: if user explicitly asks to start a new chat, clear the chat history
-
         # load recent history
         chat_id = msg_json['chat_id']
         if chat_id in self.chat_history:
             history = self.chat_history[chat_id][-3:]
         else:
             history = []
+
+        # TODO: if user explicitly asks to start a new chat, clear the chat history
 
         # add recent messages to the history
         messages = [("system", "You are a helpful assistant.")]
@@ -78,11 +67,10 @@ class MessageDealer:
             else:
                 messages.append(("human", past_msg['content']['text']))
 
+        msg = msg_json['content']['text']
         messages.append(("human", msg))
         ai_msg = self.llm.invoke(messages)
-        response['content']['text'] = ai_msg.content
-        response['timestamp'] = GetISOTimestamp()
-        response['update_time'] = response['timestamp']
+        response = simple_msg_by(msg_json, self.name, ai_msg.content)
         return response
     
     def __call__(self, *args, **kwds):
