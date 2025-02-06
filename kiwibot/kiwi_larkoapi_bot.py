@@ -42,8 +42,7 @@ def main_ai_assistant():
     msg_router = MessageRouter(feishu_portal.recv_queue, feishu_portal.send_queue)
     
     # init AI agent
-    anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
-    msg_dealer = MessageDealer(anthropic_api_key, chat_log_path, 
+    msg_dealer = MessageDealer(chat_log_path, 
                                {
                                    'chattool': feishu_portal.chattool,
                                })

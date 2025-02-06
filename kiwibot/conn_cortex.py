@@ -6,7 +6,8 @@ import time
 import json
 
 from dotenv import load_dotenv
-from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
+#from langchain_anthropic import ChatAnthropic
 
 from kiwibot.utils import (
     GetISOTimestamp,
@@ -21,14 +22,21 @@ class MessageDealer:
 
     name = 'Kiwi'   # name will appear in message log
 
-    def __init__(self, anthropic_api_key, chat_database_path, tool_dict=None):
+    def __init__(self, chat_database_path, tool_dict=None):
         """Init connection to Anthropic, load historical messages"""
+        load_dotenv()
         # param: https://api.python.langchain.com/en/latest/anthropic/chat_models/langchain_anthropic.chat_models.ChatAnthropic.html
         # basic usages: https://python.langchain.com/docs/integrations/chat/anthropic/
+        # model list:
+        # gpt-3.5-turbo, deepseek-r1:70b, deepseek-r1:32b
+        self.llm = ChatOpenAI(model_name     = os.getenv("OPENAI_MODEL_NAME"),
+                              base_url       = os.getenv('OPENAI_API_URL'),
+                              openai_api_key = os.getenv('OPENAI_API_KEY'))
         # model list: 
         # claude-3-5-haiku-latest, claude-3-5-sonnet-latest, claude-3-5-sonnet-20241022
-        self.llm = ChatAnthropic(model="claude-3-5-sonnet-latest",
-                                 api_key=anthropic_api_key)
+        #anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
+        #self.llm = ChatAnthropic(model="claude-3-5-sonnet-latest",
+        #                         api_key=anthropic_api_key)
 
         self.tool_dict = tool_dict
         self.chat_database_path = chat_database_path
@@ -137,18 +145,68 @@ class MessageDealer:
 # To ask questions
 # https://chat.langchain.com/
 
+def test_request_response():
+    """Test the openai api through raw requests directly"""
+    import requests
+    import os
+    from dotenv import load_dotenv
+    
+    load_dotenv()
+    
+    # API endpoint
+    api_endpoint = "http://10.1.1.5:18434/v1/chat/completions"
+    
+    # Test message
+    messages = [
+        {"role": "user", "content": "What is 2+2?"}
+    ]
+    
+    # Request headers and data
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY', 'dummy-key')}"
+    }
+    
+    data = {
+        "model": "deepseek-r1:70b",
+        "messages": messages,
+        "temperature": 0.7,
+        "max_tokens": 150
+    }
+    
+    try:
+        response = requests.post(api_endpoint, headers=headers, json=data)
+        response.raise_for_status()
+        result = response.json()
+        print("Status Code:", response.status_code)
+        print("Response:", result)
+        return result
+    except requests.exceptions.RequestException as e:
+        print(f"Error making request: {e}")
+        return None
+
 if __name__ == '__main__':
-    # test only
+    """ main for test only """
+    #test_request_response()
+    #exit(0)
+
     load_dotenv()
 
-    # Instantiate the ChatAnthropic model
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
+    # Instantiate the ChatOpenAI model with custom API endpoint
+    # set api_key in .env
+    llm = ChatOpenAI(
+        model_name="deepseek-r1:70b",
+        base_url=os.getenv('OPENAI_API_URL')
+    )
 
     # Define a function to interact with the chatbot
     def chat_with_bot(user_input):
+        #messages = [
+        #    ("system", "You are a helpful assistant."),
+        #    ("human", user_input)
+        #]
         messages = [
-            ("system", "You are a helpful assistant."),
-            ("human", user_input)
+            ("human", user_input),
         ]
         ai_msg = llm.invoke(messages)
         return ai_msg.content
